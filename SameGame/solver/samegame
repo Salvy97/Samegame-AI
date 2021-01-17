@@ -1,0 +1,49 @@
+% MODELLO DEI DATI IN INPUT
+% color(C) colore disponibile
+% cell(I, J, C) cella in posizione i, j con relativo colore
+% blockSize(I, J, S) grandezza del blocco corrispondente al colore della cella in posizione i, j
+
+pick(I, J) | noPick(I, J) :- cell(I, J, C), color(C).
+
+% Non posso non prendere una cella
+:- #count{I, J : pick(I, J)} != 1.
+
+% Calcolo se una cella ha uno o più vicini
+% hasNeighbourLeft(I, J) :- pick(I, J), cell(I, J, C), cell(R, J, C), R = I - 1.
+% hasNeighbourRight(I, J) :- pick(I, J), cell(I, J, C), cell(R, J, C), R = I + 1.
+% hasNeighbourUp(I, J) :- pick(I, J), cell(I, J, C), cell(I, R, C), R = J - 1.
+% hasNeighbourDown(I, J) :- pick(I, J), cell(I, J, C), cell(I, R, C), R = J + 1.
+
+% Non posso prendere una cella singola
+% :- pick(I, J), not hasNeighbourLeft(I, J), not hasNeighbourRight(I, J), not hasNeighbourUp(I, J), not hasNeighbourDown(I, J).
+% Oppure posso dire anche
+:- pick(I, J), blockSize(I, J, 1).
+
+% Sto attento a non prendere blocchi che fanno rimanere celle singole dello stesso colore
+colorCount(C, N) :- color(C), #count{I, J : cell(I, J, C)} = N.
+:~ pick(I, J), cell(I, J, C), blockSize(I, J, S), colorCount(C, N), N - S = 1. [1@2]
+
+% Vedo il blocco sopra per ogni cella
+nextCellSameColorAbove(I, J, IC, J) :- cell(I, J, C), cell(IC, J, C), IC = I - 1.
+% Ricorsione finché non trovo una cella di colore diverso
+nextCellSameColorAbove(I, J, IC2, J) :- nextCellSameColorAbove(I, J, IC1, J), nextCellSameColorAbove(IC1, J, IC2, J).
+% Prendo la cella con la riga minore (quindi l'ultima sopra di quel blocco)
+%lastCellSameColorAbove(I, J, IM, J) :- cell(I, J, _), #min{IC : nextCellSameColorAbove(I, J, IC, J)} = IM.
+lastCellSameColorAbove(I, J, I, J) :- cell(I, J, _), not nextCellSameColorAbove(I, J, I - 1, J).
+% Prendo la cella del blocco che sta sopra
+cellBlockAbove(I, J, IB, J) :- cell(IB, J, _), lastCellSameColorAbove(I, J, IC, J), IB = IC - 1.
+
+% Vedo il blocco sotto per ogni cella
+nextCellSameColorBelow(I, J, IC, J) :- cell(I, J, C), cell(IC, J, C), IC = I + 1.
+nextCellSameColorBelow(I, J, IC2, J) :- nextCellSameColorBelow(I, J, IC1, J), nextCellSameColorBelow(IC1, J, IC2, J).
+%lastCellSameColorBelow(I, J, IM, J) :- cell(I, J, _), #max{IC : nextCellSameColorBelow(I, J, IC, J)} = IM.
+lastCellSameColorBelow(I, J, I, J) :- cell(I, J, _), not nextCellSameColorBelow(I, J, I + 1, J).
+cellBlockBelow(I, J, IB, J) :- cell(IB, J, _), lastCellSameColorBelow(I, J, IC, J), IB = IC + 1.
+
+% Calcolo la somma che ne uscirebbe se unissi i due blocchi soprastanti e sottostanti che sono dello stesso colore
+sizeBlocksJoinAboveBelow(I, J, S) :- pick(I, J), cellBlockAbove(I, J, IA, J), cellBlockBelow(I, J, IB, J), cell(IA, J, C), cell(IB, J, C), blockSize(IA, J, S1), blockSize(IB, J, S2), S = S1 + S2.
+
+% Pago di più se non rimuovo blocchi che mi fanno unire altri blocchi per formarne di più grandi
+cellsNumber(N) :- #count{I, J : cell(I, J, _)} = N.
+:~ pick(I, J), sizeBlocksJoinAboveBelow(I, J, S), cellsNumber(N), COST = N - S, COST >= 0. [COST@1]
+:~ pick(I, J), #count{I, J : sizeBlocksJoinAboveBelow(I, J, _)} = 0, cellsNumber(N). [N@1]
